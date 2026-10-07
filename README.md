@@ -102,6 +102,6 @@ The root `render.yaml` defines a Render Blueprint for the frontend, FastAPI API,
 3. After deployment, add `OPENAI_API_KEY` to the `adaptiq-api` service's environment variables if you want live AI tutor hints. Keep this key only in Render's backend environment.
 4. Open the `adaptiq-web` URL. Register a new account and test sign-in, question evaluation, progress, and tutor behavior.
 
-Render configures the database URL, generated authentication secret, HTTPS-only cookies, and frontend/API host references through the Blueprint. The API dynamically trusts the deployed frontend host for CORS and CSRF origin validation.
+Render configures the database URL, generated authentication secret, HTTPS-only cookies, live API mode, and frontend/API host references through the Blueprint. The API dynamically trusts the deployed frontend host for CORS and CSRF origin validation.
 
 **Free database warning:** Render's free PostgreSQL database expires 30 days after creation. After expiry, it becomes inaccessible; after a further 14-day grace period without upgrading, Render deletes its data. Free web services also sleep when idle, so the first request can be slow. This free setup is for a short-lived portfolio demo, not production or durable learner data. Upgrade the database before expiry if you need to preserve accounts and attempts. Deployment starts with a fresh database; local accounts and attempts are not migrated.
