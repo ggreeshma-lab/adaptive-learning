@@ -213,6 +213,20 @@ def test_render_frontend_host_is_an_allowed_csrf_origin(question_client, monkeyp
     assert response.status_code == 200
 
 
+def test_render_frontend_service_slug_adds_host_domain(question_client, monkeypatch) -> None:
+    monkeypatch.setattr(main.settings, "frontend_host", "adaptiq-frontend")
+    headers = csrf_headers(question_client)
+    headers["Origin"] = "https://adaptiq-frontend.onrender.com"
+
+    response = question_client.post(
+        "/api/auth/register",
+        json={"email": "render-slug@example.com", "password": "strong-pass-123"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+
 def test_evaluate_answer_persists_attempt_and_returns_review_data(question_client) -> None:
     register_user(question_client)
 

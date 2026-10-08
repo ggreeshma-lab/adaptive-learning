@@ -3,9 +3,12 @@
  * Set VITE_USE_LIVE_QUESTIONS=true to fetch questions from the FastAPI server.
  */
 const API_HOST = import.meta.env.VITE_API_HOST;
-export const API_BASE =
-  (API_HOST ? `https://${API_HOST}/api` : import.meta.env.VITE_API_BASE_URL) ||
-  "http://localhost:8000/api";
+const API_ORIGIN = API_HOST
+  ? `https://${API_HOST.includes(".") ? API_HOST : `${API_HOST}.onrender.com`}`
+  : null;
+export const API_BASE = API_ORIGIN
+  ? `${API_ORIGIN}/api`
+  : import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 export const USE_LIVE_QUESTIONS = import.meta.env.VITE_USE_LIVE_QUESTIONS === "true";
 const USE_MOCK = true;
 

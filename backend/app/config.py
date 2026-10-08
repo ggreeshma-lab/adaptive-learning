@@ -20,6 +20,8 @@ class Settings(BaseSettings):
         origins = list(self.cors_origins)
         if self.frontend_host:
             host = self.frontend_host.removeprefix("https://").rstrip("/")
+            if "." not in host:
+                host = f"{host}.onrender.com"
             frontend_origin = f"https://{host}"
             if frontend_origin not in origins:
                 origins.append(frontend_origin)
