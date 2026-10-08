@@ -45,7 +45,7 @@ export function AuthGate({ children }: AuthGateProps) {
   }
 
   if (!USE_LIVE_QUESTIONS) {
-    return children({ id: "mock-user", email: "demo@localhost" }, async () => {});
+    return children({ id: "mock-user", username: "demo" }, async () => {});
   }
   if (user) return children(user, logout);
 
@@ -60,7 +60,7 @@ function AuthForm({
   initialError: string | null;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
@@ -72,8 +72,8 @@ function AuthForm({
     try {
       const user =
         mode === "register"
-          ? await registerAccount(email, password)
-          : await loginAccount(email, password);
+          ? await registerAccount(username, password)
+          : await loginAccount(username, password);
       onAuthenticated(user);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Authentication failed.");
@@ -124,16 +124,24 @@ function AuthForm({
 
         <form onSubmit={submit} className="space-y-4">
           <label className="block space-y-1.5 text-sm">
-            <span>Email</span>
+            <span>Username</span>
             <input
-              type="email"
-              autoComplete="email"
+              type="text"
+              autoComplete="username"
+              minLength={3}
+              maxLength={32}
+              pattern="[A-Za-z0-9_]+"
               required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring"
             />
           </label>
+          {mode === "register" && (
+            <p className="-mt-3 text-xs text-muted-foreground">
+              Use 3–32 letters, numbers, or underscores.
+            </p>
+          )}
           <label className="block space-y-1.5 text-sm">
             <span>Password</span>
             <input

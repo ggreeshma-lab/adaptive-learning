@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Topic = Literal["Python Data Structures", "System Design", "SQL Query Optimization"]
 
@@ -29,15 +29,20 @@ class GenerateQuestionRequest(BaseModel):
 
 
 class CredentialsRequest(BaseModel):
-    email: EmailStr
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_]+$")
     password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, username: str) -> str:
+        return username.lower()
 
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    email: EmailStr
+    username: str
 
 
 class EvaluationRequest(BaseModel):

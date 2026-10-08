@@ -10,14 +10,14 @@ export function TopNav({
   topic,
   onTopic,
   streak,
-  email,
+  username,
   onLogout,
 }: {
   elo: number;
   topic: Topic;
   onTopic: (t: Topic) => void;
   streak: number;
-  email: string;
+  username: string;
   onLogout: () => void;
 }) {
   const [secs, setSecs] = useState(0);
@@ -78,7 +78,7 @@ export function TopNav({
           <button
             onClick={() => void handleLogout()}
             className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-            title={`Signed in as ${email}`}
+            title={`Signed in as ${username}`}
           >
             Log out
           </button>

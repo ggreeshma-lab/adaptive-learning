@@ -69,11 +69,11 @@ def register(
     session: SessionDependency,
 ) -> User:
     try:
-        user = create_user(session, str(credentials.email), credentials.password)
+        user = create_user(session, credentials.username, credentials.password)
     except IntegrityError as error:
         session.rollback()
         raise HTTPException(
-            status_code=409, detail="An account with this email already exists"
+            status_code=409, detail="An account with this username already exists"
         ) from error
     set_session_cookie(response, user)
     return user
@@ -86,10 +86,9 @@ def login(
     _: CsrfDependency,
     session: SessionDependency,
 ) -> User:
-    email = str(credentials.email).strip().lower()
-    user = session.scalar(select(User).where(User.email == email))
+    user = session.scalar(select(User).where(User.username == credentials.username))
     if user is None or not verify_password(credentials.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     set_session_cookie(response, user)
     return user
 

@@ -1,12 +1,17 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app import main
-from app.database import _sqlalchemy_database_url, get_db, initialize_database
+from app.database import (
+    _migrate_legacy_email_accounts,
+    _sqlalchemy_database_url,
+    get_db,
+    initialize_database,
+)
 from app.models import Base
 
 client = TestClient(main.app)
@@ -22,10 +27,10 @@ def csrf_headers(test_client: TestClient) -> dict[str, str]:
     }
 
 
-def register_user(test_client: TestClient, email: str = "learner@example.com") -> dict[str, str]:
+def register_user(test_client: TestClient, username: str = "learner") -> dict[str, str]:
     response = test_client.post(
         "/api/auth/register",
-        json={"email": email, "password": "strong-pass-123"},
+        json={"username": username, "password": "strong-pass-123"},
         headers=csrf_headers(test_client),
     )
     assert response.status_code == 200
@@ -75,6 +80,43 @@ def test_database_url_uses_installed_postgres_driver(
     expected_driver: str,
 ) -> None:
     assert _sqlalchemy_database_url(database_url).drivername == expected_driver
+
+
+def test_legacy_email_accounts_migrate_to_usernames_without_losing_progress() -> None:
+    test_engine = create_engine("sqlite://")
+    with test_engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL, "
+                "password_hash TEXT NOT NULL)"
+            )
+        )
+        connection.execute(text("CREATE UNIQUE INDEX ix_users_email ON users (email)"))
+        connection.execute(
+            text("CREATE TABLE attempts (id INTEGER PRIMARY KEY, user_id TEXT NOT NULL)")
+        )
+        connection.execute(
+            text("INSERT INTO users VALUES ('first', 'Learner.Name@example.com', 'hash')")
+        )
+        connection.execute(
+            text("INSERT INTO users VALUES ('second', 'learner.name@another.com', 'hash')")
+        )
+        connection.execute(text("INSERT INTO attempts VALUES (1, 'first')"))
+
+    _migrate_legacy_email_accounts(test_engine)
+
+    with test_engine.connect() as connection:
+        users = connection.execute(
+            text("SELECT id, username, password_hash FROM users ORDER BY id")
+        ).all()
+        attempts = connection.execute(text("SELECT user_id FROM attempts")).all()
+
+    assert users == [("first", "learner_name", "hash"), ("second", "learner_name2", "hash")]
+    assert attempts == [("first",)]
+
+    with pytest.raises(IntegrityError), test_engine.begin() as connection:
+        connection.execute(text("INSERT INTO users VALUES ('third', 'LEARNER_NAME', 'hash')"))
+    test_engine.dispose()
 
 
 def test_database_health_check_when_connected(monkeypatch) -> None:
@@ -146,12 +188,13 @@ def test_generate_question_rejects_unknown_topic(question_client) -> None:
 def test_register_login_session_and_logout(question_client) -> None:
     registration = question_client.post(
         "/api/auth/register",
-        json={"email": "Learner@example.com", "password": "strong-pass-123"},
+        json={"username": "Learner_1", "password": "strong-pass-123"},
         headers=csrf_headers(question_client),
     )
 
     assert registration.status_code == 200
-    assert registration.json()["email"] == "learner@example.com"
+    assert registration.json()["username"] == "learner_1"
+    assert "email" not in registration.json()
     assert "password_hash" not in registration.json()
     assert "httponly" in registration.headers["set-cookie"].lower()
     assert question_client.get("/api/auth/me").json()["id"] == registration.json()["id"]
@@ -164,34 +207,45 @@ def test_register_login_session_and_logout(question_client) -> None:
 
     login = question_client.post(
         "/api/auth/login",
-        json={"email": "LEARNER@example.com", "password": "strong-pass-123"},
+        json={"username": "LEARNER_1", "password": "strong-pass-123"},
         headers=csrf_headers(question_client),
     )
     assert login.status_code == 200
     assert question_client.get("/api/auth/me").status_code == 200
 
 
-def test_registration_rejects_duplicate_email(question_client) -> None:
+def test_registration_rejects_duplicate_username_case_insensitively(question_client) -> None:
     register_user(question_client)
 
     duplicate = question_client.post(
         "/api/auth/register",
-        json={"email": "LEARNER@example.com", "password": "strong-pass-123"},
+        json={"username": "LEARNER", "password": "strong-pass-123"},
         headers=csrf_headers(question_client),
     )
 
     assert duplicate.status_code == 409
 
 
+@pytest.mark.parametrize("username", ["ab", "a" * 33, "has space", "user-name", "ümlaut"])
+def test_registration_rejects_invalid_usernames(question_client, username: str) -> None:
+    response = question_client.post(
+        "/api/auth/register",
+        json={"username": username, "password": "strong-pass-123"},
+        headers=csrf_headers(question_client),
+    )
+
+    assert response.status_code == 422
+
+
 def test_mutating_auth_request_requires_csrf_and_allowed_origin(question_client) -> None:
     no_csrf = question_client.post(
         "/api/auth/register",
-        json={"email": "learner@example.com", "password": "strong-pass-123"},
+        json={"username": "learner", "password": "strong-pass-123"},
         headers={"Origin": FRONTEND_ORIGIN},
     )
     wrong_origin = question_client.post(
         "/api/auth/register",
-        json={"email": "learner@example.com", "password": "strong-pass-123"},
+        json={"username": "learner", "password": "strong-pass-123"},
         headers={**csrf_headers(question_client), "Origin": "https://attacker.example"},
     )
 
@@ -206,7 +260,7 @@ def test_render_frontend_host_is_an_allowed_csrf_origin(question_client, monkeyp
 
     response = question_client.post(
         "/api/auth/register",
-        json={"email": "render-learner@example.com", "password": "strong-pass-123"},
+        json={"username": "render_learner", "password": "strong-pass-123"},
         headers=headers,
     )
 
@@ -220,7 +274,7 @@ def test_render_frontend_service_slug_adds_host_domain(question_client, monkeypa
 
     response = question_client.post(
         "/api/auth/register",
-        json={"email": "render-slug@example.com", "password": "strong-pass-123"},
+        json={"username": "render_slug", "password": "strong-pass-123"},
         headers=headers,
     )
 
@@ -348,7 +402,7 @@ def test_attempts_and_mastery_are_isolated_per_user(question_client) -> None:
     assert wrong_answer.status_code == 200
 
     question_client.post("/api/auth/logout", json={}, headers=csrf_headers(question_client))
-    register_user(question_client, "second@example.com")
+    register_user(question_client, "second")
     mastery = question_client.get("/api/mastery")
 
     assert mastery.status_code == 200

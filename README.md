@@ -62,7 +62,9 @@ This endpoint selects a curated question from PostgreSQL; it does not generate n
 
 ## Accounts, answer evaluation, and progress
 
-When `VITE_USE_LIVE_QUESTIONS=true`, the frontend requires an account before starting a session. Create an account with an email and password of at least 8 characters, or log in with an existing account. Authentication uses a JWT in an HttpOnly cookie, plus a CSRF token for state-changing requests. Passwords are stored as Argon2 hashes.
+When `VITE_USE_LIVE_QUESTIONS=true`, the frontend requires an account before starting a session. Create an account with a username (3–32 letters, numbers, or underscores) and a password of at least 8 characters, or log in with an existing account. Usernames are case-insensitive. Authentication uses a JWT in an HttpOnly cookie, plus a CSRF token for state-changing requests. Passwords are stored as Argon2 hashes.
+
+Existing accounts are migrated automatically when the backend starts: each username is derived from the part of the old email address before `@`, with invalid characters replaced and a numeric suffix added if needed to resolve a collision. Password hashes, account IDs, and learning progress are preserved.
 
 Authenticated API routes:
 
@@ -72,7 +74,7 @@ Authenticated API routes:
 - `POST /api/evaluate` — validate an answer against the server-side answer key and persist the attempt.
 - `GET /api/mastery` — return Elo, per-skill accuracy, missed-question concepts, streak, and answer count from the learner's persisted attempts.
 
-The current Elo baseline is 1420. Mastery and attempts are scoped to the authenticated user. The small initial question bank remains curated. AI tutor hints are implemented as described below. Email verification, password reset, rate limiting, and database migration tooling are not implemented yet. Do not use the local development `AUTH_SECRET` default in production.
+The current Elo baseline is 1420. Mastery and attempts are scoped to the authenticated user. The small initial question bank remains curated. AI tutor hints are implemented as described below. Password reset and rate limiting are not implemented yet. Do not use the local development `AUTH_SECRET` default in production.
 
 ## AI tutor
 

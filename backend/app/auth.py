@@ -102,8 +102,8 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 CsrfDependency = Annotated[None, Depends(require_csrf)]
 
 
-def create_user(session: Session, email: str, password: str) -> User:
-    user = User(email=email.strip().lower(), password_hash=password_hash.hash(password))
+def create_user(session: Session, username: str, password: str) -> User:
+    user = User(username=username.lower(), password_hash=password_hash.hash(password))
     session.add(user)
     session.commit()
     session.refresh(user)

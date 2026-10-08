@@ -53,7 +53,7 @@ export interface HintRequest {
 
 export interface AuthUser {
   id: string;
-  email: string;
+  username: string;
 }
 
 const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms));
@@ -228,12 +228,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 }
 
-export async function registerAccount(email: string, password: string): Promise<AuthUser> {
-  return postJson<AuthUser>("/auth/register", { email, password });
+export async function registerAccount(username: string, password: string): Promise<AuthUser> {
+  return postJson<AuthUser>("/auth/register", { username, password });
 }
 
-export async function loginAccount(email: string, password: string): Promise<AuthUser> {
-  return postJson<AuthUser>("/auth/login", { email, password });
+export async function loginAccount(username: string, password: string): Promise<AuthUser> {
+  return postJson<AuthUser>("/auth/login", { username, password });
 }
 
 export async function logoutAccount(): Promise<void> {

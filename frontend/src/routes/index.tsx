@@ -45,7 +45,7 @@ function LearningSession({ user, onLogout }: { user: AuthUser; onLogout: () => P
         topic={s.topic}
         onTopic={s.changeTopic}
         streak={s.streak}
-        email={user.email}
+        username={user.username}
         onLogout={() => void onLogout()}
       />
       <div className={`mx-auto grid max-w-7xl ${s.tutorOpen ? "lg:grid-cols-[1fr_400px]" : ""}`}>
