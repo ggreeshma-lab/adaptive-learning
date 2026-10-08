@@ -9,6 +9,12 @@ import app from "./dist/server/server.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const clientDirectory = resolve("dist/client");
+const configuredApiHost = process.env.VITE_API_HOST;
+const apiHost = configuredApiHost
+  ? configuredApiHost.includes(".")
+    ? configuredApiHost
+    : `${configuredApiHost}.onrender.com`
+  : null;
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".ico": "image/x-icon",
@@ -56,6 +62,46 @@ const server = createServer(async (incoming, outgoing) => {
   try {
     const requestUrl = new URL(incoming.url ?? "/", `http://${incoming.headers.host}`);
     if (await serveAsset(requestUrl.pathname, outgoing)) return;
+
+    if (apiHost && requestUrl.pathname.startsWith("/api/")) {
+      const targetUrl = new URL(`${requestUrl.pathname}${requestUrl.search}`, `https://${apiHost}`);
+      const headers = new Headers();
+      const excludedHeaders = new Set([
+        "connection",
+        "content-length",
+        "host",
+        "keep-alive",
+        "proxy-connection",
+        "transfer-encoding",
+      ]);
+      for (const [name, value] of Object.entries(incoming.headers)) {
+        if (value !== undefined && !excludedHeaders.has(name.toLowerCase())) {
+          headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+        }
+      }
+
+      const method = incoming.method ?? "GET";
+      const result = await fetch(targetUrl, {
+        method,
+        headers,
+        ...(method === "GET" || method === "HEAD"
+          ? {}
+          : { body: Readable.toWeb(incoming), duplex: "half" }),
+        redirect: "manual",
+      });
+      const responseHeaders = Object.fromEntries(result.headers);
+      delete responseHeaders.connection;
+      delete responseHeaders["content-encoding"];
+      delete responseHeaders["content-length"];
+      delete responseHeaders["keep-alive"];
+      delete responseHeaders["transfer-encoding"];
+      const cookies = result.headers.getSetCookie();
+      if (cookies.length > 0) responseHeaders["set-cookie"] = cookies;
+      outgoing.writeHead(result.status, responseHeaders);
+      if (result.body) await pipeline(Readable.fromWeb(result.body), outgoing);
+      else outgoing.end();
+      return;
+    }
 
     const headers = new Headers();
     for (const [name, value] of Object.entries(incoming.headers)) {
